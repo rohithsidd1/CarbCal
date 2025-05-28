@@ -7,7 +7,7 @@ class OpenAIService {
     private let logPrefix = "[OpenAI]"
     
     // Azure OpenAI Configuration
-    private let apiKey = "C4PIM1VYB5GWha0pQNJM7jqkjpTHNp1pTQ7wyz3kd1ZU03Hy3eJLJQQJ99BAACfhMk5XJ3w3AAABACOGkqOR"
+    private let apiKey = ""
     private let endpoint = "https://sweden-openai89099.openai.azure.com"
     private let deploymentName = "gpt-4o-mini"
     private let apiVersion = "2024-08-01-preview"
