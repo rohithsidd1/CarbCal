@@ -4,19 +4,24 @@ struct ResultsView: View {
     // MARK: - Properties
     let analysisResult: AnalysisResponse
     let foodImage: UIImage?
+    let appState: AppState
     private let logPrefix = "[ResultsView]"
-    
+    @Environment(\.dismiss) private var dismiss
+    @State private var foodLogStore = FoodLogStore()
+    @Environment(\.colorScheme) private var colorScheme
     // State for editing
     @State private var isEditing = false
     @State private var editedIngredients: [Ingredient]
     @State private var editedTotal: NutritionTotal
     @State private var editedDishName: String
     @State private var showingSaveAlert = false
+    @State private var showingSaveSuccess = false
     
     // MARK: - Initialization
-    init(analysisResult: AnalysisResponse, foodImage: UIImage?) {
+    init(analysisResult: AnalysisResponse, foodImage: UIImage?, appState: AppState) {
         self.analysisResult = analysisResult
         self.foodImage = foodImage
+        self.appState = appState
         // Initialize state with current values
         _editedIngredients = State(initialValue: analysisResult.ingredients)
         _editedTotal = State(initialValue: analysisResult.total)
@@ -25,199 +30,229 @@ struct ResultsView: View {
     
     // MARK: - Body
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Food Image Section
-                if let image = foodImage {
-                    VStack {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 250)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
+        VStack{
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Food Image Section
+                    if let image = foodImage {
+                        VStack {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 250)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: Theme.shadowColor, radius: 8, x: 0, y: 4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Theme.cardBackground.opacity(0.2), lineWidth: 1)
+                                )
+                        }
+                        .padding(.horizontal, 16)
+                        .transition(.opacity)
+                        .onAppear {
+                            print("\(logPrefix) Displaying food image")
+                        }
                     }
+                    
+                    // Dish Name Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Dish Name")
+                            .font(.headline)
+                            .foregroundStyle(Theme.secondaryText)
+                        
+                        if isEditing {
+                            TextField("Dish Name", text: $editedDishName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .font(.title2)
+                        } else {
+                            Text(editedDishName)
+                                .font(.title2)
+                                .bold()
+                                .foregroundStyle(Theme.primaryText)
+                                .lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-                    .transition(.opacity)
-                    .onAppear {
-                        print("\(logPrefix) Displaying food image")
-                    }
-                }
-                
-                // Dish Name Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Dish Name")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
                     
-                    if isEditing {
-                        TextField("Dish Name", text: $editedDishName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .font(.title2)
-                    } else {
-                        Text(editedDishName)
-                            .font(.title2)
-                            .bold()
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                
-                // Health Score Section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Health Score")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(1...10, id: \.self) { score in
-                                Circle()
-                                    .fill(score <= editedTotal.healthScore ? 
-                                        Color.green.opacity(0.8) : 
-                                        Color.gray.opacity(0.2))
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                                    )
-                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    // Health Score Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Health Score")
+                            .font(.headline)
+                            .foregroundStyle(Theme.secondaryText)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(1...10, id: \.self) { score in
+                                    Circle()
+                                        .fill(score <= editedTotal.healthScore ?
+                                              Theme.accentGreen.opacity(0.8) :
+                                                Theme.secondaryText.opacity(0.2))
+                                        .frame(width: 20, height: 20)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Theme.cardBackground.opacity(0.2), lineWidth: 1)
+                                        )
+                                        .shadow(color: Theme.shadowColor, radius: 2, x: 0, y: 1)
+                                }
                             }
                         }
                     }
-                }
-                .padding(16)
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                .padding(.horizontal, 16)
-                
-                // Total Nutrition Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Total Nutrition")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                    .padding(16)
+                    .background(Theme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Theme.shadowColor, radius: 5, x: 0, y: 2)
+                    .padding(.horizontal, 16)
                     
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
-                    ], spacing: 12) {
-                        NutritionCard(
-                            title: "Calories",
-                            value: "\(Int(editedTotal.calories))",
-                            unit: "kcal",
-                            color: .orange
-                        )
+                    // Total Nutrition Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Total Nutrition")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
                         
-                        NutritionCard(
-                            title: "Carbs",
-                            value: String(format: "%.1f", editedTotal.carbs),
-                            unit: "g",
-                            color: .blue
-                        )
-                        
-                        NutritionCard(
-                            title: "Protein",
-                            value: String(format: "%.1f", editedTotal.protein),
-                            unit: "g",
-                            color: .green
-                        )
-                        
-                        NutritionCard(
-                            title: "Fats",
-                            value: String(format: "%.1f", editedTotal.fats),
-                            unit: "g",
-                            color: .red
-                        )
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 12) {
+                            NutritionCard(
+                                title: "Calories",
+                                value: "\(Int(editedTotal.calories))",
+                                unit: "kcal",
+                                color: .orange
+                            )
+                            
+                            NutritionCard(
+                                title: "Carbs",
+                                value: String(format: "%.1f", editedTotal.carbs),
+                                unit: "g",
+                                color: .blue
+                            )
+                            
+                            NutritionCard(
+                                title: "Protein",
+                                value: String(format: "%.1f", editedTotal.protein),
+                                unit: "g",
+                                color: .green
+                            )
+                            
+                            NutritionCard(
+                                title: "Fats",
+                                value: String(format: "%.1f", editedTotal.fats),
+                                unit: "g",
+                                color: .red
+                            )
+                        }
                     }
-                }
-                .padding(16)
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                .padding(.horizontal, 16)
-                
-                // Ingredients Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Ingredients")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                    .padding(16)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    .padding(.horizontal, 16)
                     
-                    ForEach($editedIngredients) { $ingredient in
-                        EditableIngredientCard(ingredient: $ingredient, isEditing: isEditing)
-                            .transition(.opacity)
-                    }
-                }
-                .padding(16)
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                .padding(.horizontal, 16)
-                
-                // Action Buttons
-                HStack(spacing: 16) {
-                    if isEditing {
-                        Button(action: {
-                            print("\(logPrefix) Canceling edits")
-                            // Reset to original values
-                            editedIngredients = analysisResult.ingredients
-                            editedTotal = analysisResult.total
-                            editedDishName = analysisResult.dishName
-                            isEditing = false
-                        }) {
-                            Text("Cancel")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
+                    // Ingredients Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Ingredients")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
                         
-                        Button(action: {
-                            print("\(logPrefix) Saving edits")
-                            // Update total nutrition
-                            updateTotalNutrition()
-                            isEditing = false
-                            showingSaveAlert = true
-                        }) {
-                            Text("Done")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    } else {
-                        Button(action: {
-                            print("\(logPrefix) Starting edit mode")
-                            isEditing = true
-                        }) {
-                            Text("Fix Results")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
+                        ForEach($editedIngredients) { $ingredient in
+                            EditableIngredientCard(ingredient: $ingredient, isEditing: isEditing)
+                                .transition(.opacity)
                         }
                     }
+                    .padding(16)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
-            .padding(.vertical, 16)
+            
+            // Action Buttons
+            HStack(spacing: 16) {
+                if isEditing {
+                    Button(action: {
+                        print("\(logPrefix) Canceling edits")
+                        // Reset to original values
+                        editedIngredients = analysisResult.ingredients
+                        editedTotal = analysisResult.total
+                        editedDishName = analysisResult.dishName
+                        isEditing = false
+                    }) {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    
+                    Button(action: {
+                        print("\(logPrefix) Saving edits")
+                        // Update total nutrition
+                        updateTotalNutrition()
+                        isEditing = false
+                        showingSaveAlert = true
+                    }) {
+                        Text("Done")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                } else {
+                    Button(action: {
+                        print("\(logPrefix) Starting edit mode")
+                        isEditing = true
+                    }) {
+                        Text("Edit")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .foregroundColor(.primary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 50)
+                                    .stroke(Color.primary, lineWidth: 2)
+                            )
+                            .background(Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 50))
+                    }
+
+                    Button(action: {
+                        print("\(logPrefix) Saving food log")
+                        saveFoodLog()
+                    }) {
+                        Text("Save")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(colorScheme == .light ? .white : .black)
+                            .padding()
+                            .background(Color.primary)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 50))
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
         }
         .navigationTitle("Analysis Results")
         .navigationBarTitleDisplayMode(.inline)
-        .background(Color(.systemGroupedBackground))
+        .background(Theme.background)
         .alert("Changes Saved", isPresented: $showingSaveAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Your changes have been saved successfully.")
+        }
+        .alert("Log Saved", isPresented: $showingSaveSuccess) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text("Your food log has been saved successfully.")
         }
     }
     
@@ -236,6 +271,20 @@ struct ResultsView: View {
             healthScore: editedTotal.healthScore
         )
     }
+    
+    private func saveFoodLog() {
+        let foodLog = FoodLog(
+            imagePath: "", // TODO: Save image and get path
+            dishName: editedDishName,
+            date: Date(),
+            ingredients: editedIngredients,
+            healthScore: editedTotal.healthScore
+        )
+        
+        foodLogStore.saveLog(foodLog)
+        appState.shouldRefreshHomeView = true
+        showingSaveSuccess = true
+    }
 }
 
 // MARK: - Supporting Views
@@ -249,16 +298,16 @@ struct NutritionCard: View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.secondaryText)
             
             Text(value)
                 .font(.title3)
                 .bold()
-                .foregroundColor(color)
+                .foregroundStyle(color)
             
             Text(unit)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.secondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -282,7 +331,7 @@ struct EditableIngredientCard: View {
             } else {
                 Text(ingredient.name)
                     .font(.headline)
-                    .foregroundColor(.primary)
+                    .foregroundStyle(Theme.primaryText)
                     .lineLimit(1)
             }
             
@@ -292,17 +341,17 @@ struct EditableIngredientCard: View {
                         EditableNutritionBadge(
                             label: "Cal",
                             value: $ingredient.calories,
-                            color: .orange
+                            color: Theme.accentOrange
                         )
                         EditableNutritionBadge(
                             label: "Carbs",
                             value: $ingredient.carbs,
-                            color: .blue
+                            color: Theme.accentBlue
                         )
                         EditableNutritionBadge(
                             label: "Prot",
                             value: $ingredient.protein,
-                            color: .green
+                            color: Theme.accentGreen
                         )
                         EditableNutritionBadge(
                             label: "Fats",
@@ -313,17 +362,17 @@ struct EditableIngredientCard: View {
                         NutritionBadge(
                             label: "Cal",
                             value: "\(Int(ingredient.calories))",
-                            color: .orange
+                            color: Theme.accentOrange
                         )
                         NutritionBadge(
                             label: "Carbs",
                             value: String(format: "%.1fg", ingredient.carbs),
-                            color: .blue
+                            color: Theme.accentBlue
                         )
                         NutritionBadge(
                             label: "Prot",
                             value: String(format: "%.1fg", ingredient.protein),
-                            color: .green
+                            color: Theme.accentGreen
                         )
                         NutritionBadge(
                             label: "Fats",
@@ -335,7 +384,7 @@ struct EditableIngredientCard: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Theme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear {
             print("\(logPrefix) Displaying ingredient: \(ingredient.name)")
@@ -405,6 +454,6 @@ struct NutritionBadge: View {
                 fats: 5,
                 healthScore: 8
             )
-        ), foodImage: UIImage(named: "sample_food_image"))
+        ), foodImage: UIImage(named: "sample_food_image"), appState: AppState())
     }
 } 

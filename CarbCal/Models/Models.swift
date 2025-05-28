@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Models
 struct Ingredient: Identifiable, Codable, Equatable {
@@ -49,5 +50,50 @@ struct FoodLog: Identifiable, Codable, Equatable {
         self.date = date
         self.ingredients = ingredients
         self.healthScore = healthScore
+    }
+}
+
+// MARK: - Food Log Store
+@Observable class FoodLogStore {
+    private let logPrefix = "[FoodLogStore]"
+    private let storage = UserDefaults.standard
+    private let foodLogsKey = "foodLogs"
+    
+    var foodLogs: [FoodLog] = []
+    
+    init() {
+        loadLogs()
+    }
+    
+    func saveLog(_ log: FoodLog) {
+        print("\(logPrefix) Saving food log: \(log.dishName)")
+        foodLogs.append(log)
+        saveToStorage()
+    }
+    
+    func getLogs(for date: Date) -> [FoodLog] {
+        return foodLogs.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
+    }
+    
+    private func loadLogs() {
+        do {
+            if let data = storage.data(forKey: foodLogsKey) {
+                foodLogs = try JSONDecoder().decode([FoodLog].self, from: data)
+                print("\(logPrefix) Loaded \(foodLogs.count) food logs")
+            }
+        } catch {
+            print("\(logPrefix) Error loading food logs: \(error)")
+            foodLogs = []
+        }
+    }
+    
+    private func saveToStorage() {
+        do {
+            let data = try JSONEncoder().encode(foodLogs)
+            storage.set(data, forKey: foodLogsKey)
+            print("\(logPrefix) Saved \(foodLogs.count) food logs to storage")
+        } catch {
+            print("\(logPrefix) Error saving food logs: \(error)")
+        }
     }
 } 
