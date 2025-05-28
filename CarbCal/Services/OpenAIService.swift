@@ -7,7 +7,7 @@ class OpenAIService {
     private let logPrefix = "[OpenAI]"
     
     // Azure OpenAI Configuration
-    private let apiKey = ""
+    private let apiKey = "C4PIM1VYB5GWha0pQNJM7jqkjpTHNp1pTQ7wyz3kd1ZU03Hy3eJLJQQJ99BAACfhMk5XJ3w3AAABACOGkqOR"
     private let endpoint = "https://sweden-openai89099.openai.azure.com"
     private let deploymentName = "gpt-4o-mini"
     private let apiVersion = "2024-08-01-preview"
@@ -52,15 +52,19 @@ class OpenAIService {
     }
     
     // MARK: - API Methods
-    func analyzeFoodImage(_ image: UIImage) async throws -> AnalysisResponse {
-        print("\(logPrefix) Starting image analysis")
+    func analyzeFoodImage(_ image: UIImage, completion: @escaping (Result<AnalysisResponse, APIError>) -> Void) {
+        // [ImageCompression] Compress image before upload
+        let logPrefix = "[OpenAIService][ImageCompression]"
+        let compressionQuality: CGFloat = 0.5 // Adjust as needed
+        guard let compressedData = image.jpegData(compressionQuality: compressionQuality) else {
+            print("\(logPrefix) Failed to compress image.")
+            completion(.failure(.invalidImageData))
+            return
+        }
+        print("\(logPrefix) Original size: \(image.pngData()?.count ?? 0) bytes, Compressed size: \(compressedData.count) bytes, Quality: \(compressionQuality)")
         
         // Convert image to base64
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            print("\(logPrefix) Failed to convert image to data")
-            throw APIError.imageConversionFailed
-        }
-        let base64Image = imageData.base64EncodedString()
+        let base64Image = compressedData.base64EncodedString()
         
         // Prepare request URL with correct Azure OpenAI format
         let urlString = "\(endpoint)/openai/deployments/\(deploymentName)/chat/completions?api-version=\(apiVersion)"
@@ -68,7 +72,8 @@ class OpenAIService {
         
         guard let url = URL(string: urlString) else {
             print("\(logPrefix) Invalid URL: \(urlString)")
-            throw APIError.invalidURL
+            completion(.failure(.invalidURL))
+            return
         }
         
         // Prepare request
@@ -105,91 +110,110 @@ class OpenAIService {
         ]
         
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+            let data = try JSONSerialization.data(withJSONObject: requestBody, options: [])
+            request.httpBody = data
             print("\(logPrefix) Request body prepared successfully")
-            
-            // Debug: Print request headers
             print("\(logPrefix) Request headers: \(request.allHTTPHeaderFields ?? [:])")
         } catch {
             print("\(logPrefix) Failed to serialize request body: \(error.localizedDescription)")
-            throw APIError.requestSerializationFailed
+            completion(.failure(.requestSerializationFailed))
+            return
         }
         
-        // Make API call
-        do {
-            print("\(logPrefix) Making API request to Azure OpenAI")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
+        // Make API call using dataTask
+        let session = URLSession.shared
+        print("\(logPrefix) Making API request to Azure OpenAI (dataTask)")
+        let task = session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("\(logPrefix) Network error: \(error.localizedDescription)")
+                completion(.failure(.apiError(statusCode: 500)))
+                return
+            }
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("\(logPrefix) Invalid response type")
-                throw APIError.invalidResponse
+                completion(.failure(.invalidResponse))
+                return
             }
-            
+            guard let data = data else {
+                print("\(logPrefix) No data received")
+                completion(.failure(.invalidResponse))
+                return
+            }
             // Print raw response data for debugging
             if let responseString = String(data: data, encoding: .utf8) {
                 print("\(logPrefix) Raw API Response: \(responseString)")
             }
-            
             if httpResponse.statusCode != 200 {
                 print("\(logPrefix) API error: \(httpResponse.statusCode)")
                 if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     print("\(logPrefix) Error details: \(errorJson)")
                 }
-                throw APIError.apiError(statusCode: httpResponse.statusCode)
+                completion(.failure(.apiError(statusCode: httpResponse.statusCode)))
+                return
             }
-            
             // Parse OpenAI response
             let decoder = JSONDecoder()
-            let apiResponse = try decoder.decode(APIResponse.self, from: data)
-            
-            // Print the content before parsing
-            if let content = apiResponse.choices.first?.message.content {
-                print("\(logPrefix) Response content before parsing: \(content)")
-            }
-            
-            // Extract and parse the JSON string from the response
-            guard let jsonString = apiResponse.choices.first?.message.content,
-                  let jsonData = jsonString.data(using: .utf8) else {
-                print("\(logPrefix) Failed to parse response content")
-                throw APIError.parsingFailed
-            }
-            
-            // Parse the analysis response
-            let apiAnalysisResponse = try decoder.decode(APIAnalysisResponse.self, from: jsonData)
-            
-            // Convert API response to app models
-            let ingredients = apiAnalysisResponse.ingredients.map { apiIngredient in
-                Ingredient(
-                    name: apiIngredient.name,
-                    calories: apiIngredient.calories,
-                    carbs: apiIngredient.carbs,
-                    protein: apiIngredient.protein,
-                    fats: apiIngredient.fats
+            do {
+                let apiResponse = try decoder.decode(APIResponse.self, from: data)
+                // Print the content before parsing
+                if let content = apiResponse.choices.first?.message.content {
+                    print("\(logPrefix) Response content before parsing: \(content)")
+                }
+                // Extract and parse the JSON string from the response
+                guard let jsonString = apiResponse.choices.first?.message.content,
+                      let jsonData = jsonString.data(using: .utf8) else {
+                    print("\(logPrefix) Failed to parse response content")
+                    completion(.failure(.parsingFailed))
+                    return
+                }
+                // Parse the analysis response
+                let apiAnalysisResponse = try decoder.decode(APIAnalysisResponse.self, from: jsonData)
+                // Convert API response to app models
+                let ingredients = apiAnalysisResponse.ingredients.map { apiIngredient in
+                    Ingredient(
+                        name: apiIngredient.name,
+                        calories: apiIngredient.calories,
+                        carbs: apiIngredient.carbs,
+                        protein: apiIngredient.protein,
+                        fats: apiIngredient.fats
+                    )
+                }
+                let total = NutritionTotal(
+                    calories: apiAnalysisResponse.total.calories,
+                    carbs: apiAnalysisResponse.total.carbs,
+                    protein: apiAnalysisResponse.total.protein,
+                    fats: apiAnalysisResponse.total.fats,
+                    healthScore: apiAnalysisResponse.total.healthScore
                 )
+                let analysisResponse = AnalysisResponse(
+                    dishName: apiAnalysisResponse.dishName,
+                    ingredients: ingredients,
+                    total: total
+                )
+                print("\(logPrefix) Analysis completed successfully")
+                completion(.success(analysisResponse))
+            } catch {
+                print("\(logPrefix) API call failed: \(error.localizedDescription)")
+                if let decodingError = error as? DecodingError {
+                    print("\(logPrefix) Decoding error details: \(decodingError)")
+                }
+                completion(.failure(.apiError(statusCode: 500)))
             }
-            
-            let total = NutritionTotal(
-                calories: apiAnalysisResponse.total.calories,
-                carbs: apiAnalysisResponse.total.carbs,
-                protein: apiAnalysisResponse.total.protein,
-                fats: apiAnalysisResponse.total.fats,
-                healthScore: apiAnalysisResponse.total.healthScore
-            )
-            
-            let analysisResponse = AnalysisResponse(
-                dishName: apiAnalysisResponse.dishName,
-                ingredients: ingredients,
-                total: total
-            )
-            
-            print("\(logPrefix) Analysis completed successfully")
-            return analysisResponse
-        } catch {
-            print("\(logPrefix) API call failed: \(error.localizedDescription)")
-            if let decodingError = error as? DecodingError {
-                print("\(logPrefix) Decoding error details: \(decodingError)")
+        }
+        task.resume()
+    }
+
+    // Async/await wrapper for concurrency compatibility
+    func analyzeFoodImage(_ image: UIImage) async throws -> AnalysisResponse {
+        return try await withCheckedThrowingContinuation { continuation in
+            self.analyzeFoodImage(image) { result in
+                switch result {
+                case .success(let response):
+                    continuation.resume(returning: response)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
             }
-            throw error
         }
     }
 }
@@ -202,4 +226,5 @@ enum APIError: Error {
     case parsingFailed
     case requestSerializationFailed
     case invalidURL
+    case invalidImageData
 } 
