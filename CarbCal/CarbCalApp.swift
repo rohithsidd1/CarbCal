@@ -7,11 +7,13 @@
 
 import SwiftUI
 
+// MARK: - App Entry Point
 @main
 struct CarbCalApp: App {
+    // MARK: - Body
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HomeView()
         }
     }
 }

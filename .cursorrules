@@ -1,0 +1,109 @@
+Always start with 'Y000!!'
+
+
+You are building an AI that take a pic of food and analyse/log calories
+
+
+# Important rules you HAVE TO FOLLOW
+- Always add debug logs & comments in the code for easier debug & readability
+- Every time you choose to apply a rule(s), explicitly state the rule(s) in the output. You can abbreviate the rule description to a single word or phrase
+
+
+# Project structure
+.
+├── buildServer.json
+├── CarbCal
+│   ├── Assets.xcassets
+│   │   ├── AccentColor.colorset
+│   │   ├── AppIcon.appiconset
+│   │   └── Contents.json
+│   ├── CarbCalApp.swift
+│   ├── ContentView.swift
+│   ├── Info.plist
+│   └── Preview Content
+│       └── Preview Assets.xcassets
+└── CarbCal.xcodeproj
+    ├── project.pbxproj
+    ├── project.xcworkspace
+    │   ├── contents.xcworkspacedata
+    │   ├── xcshareddata
+    │   └── xcuserdata
+    └── xcuserdata
+        └── rohithsiddanathi.xcuserdatad
+
+
+# Tech Stack
+- SwiftUI and Swift
+
+# Swift specific rules
+##•1. State Management
+• Use appropriate property wrappers and macros:
+- Annotate view models with '@Observable', e.g. '@Observable-final class MyModel'.
+- Do not use @State in the SwiftUI View for view-model observation. Instead, use 'let-model: MyModel'
+- For reference type state shared with a child view, pass the dependency to the constructor of the child view.
+- For value type state shared with a child view, use SwiftUI bindings if and only if the child needs write access to the state.
+- For value type state shared with a child view, pass the value if the child view only needs read access to the state.
+- Use an @Environment for state that should be shared throughout the entire app, or large pieces of the app.
+- Use '@State' only for local state that is managed by the view itself.
+
+
+## 2. Performance Optimization
+- Implement lazy loading for large lists or grids using
+(LazyVStack', (LazyHStack', or "Lazy"
+- Optimize ForEach loops by using stable identifiers.
+
+## 5. SwiftUI Lifecycle
+- Use '@main' and 'App' protocol for the app's entry point.
+
+
+## 6. SwiftUI Best Practices
+- Use 'View' as the base type for all SwiftUI views.
+- Use 'struct' for stateless views and 'class' for stateful views.
+- Use 'enum' for view states.
+- Use 'extension' for view modifiers.
+- Use 'protocol' for view protocols.
+- Use 'typealias' for view type aliases.
+
+## 7. View Composition
+- Decompose large views into smaller reusable views.
+- Name views semantically to reflect their role or intent (e.g., MealItemView, CalorieSummarySection).
+- Group related views in folders or extensions for better code organization.
+
+## 8. Debugging & Logging
+- Use print(), debugPrint(), or os_log during development; avoid committing debug logs in production builds.
+- Tag all debug logs with feature prefixes, e.g., [PhotoCapture], [CalorieEstimator].
+- Always add inline comments explaining debug logs when they're not self-explanatory.
+
+## 9. Error Handling
+- Use do-catch blocks for try statements and log or surface user-friendly errors.
+- For async/await functions, handle Task cancellation explicitly if applicable.
+- Display user-facing errors using Alert or Sheet where relevant.
+
+## 10. Networking
+- Use URLSession or appropriate abstraction for API calls.
+- Define Codable models for parsing responses.
+- Create a central NetworkManager class or protocol for API management and reuse.
+
+## 11. Accessibility
+- Always provide .accessibilityLabel, .accessibilityValue, and .accessibilityHint for interactive UI elements.
+- Prefer larger tappable areas using .contentShape(Rectangle()) where required.
+- Test with VoiceOver and Dynamic Type settings.
+
+## 12. Concurrency & Background Tasks
+- Use Task or Task.detached for structured concurrency.
+- Use @MainActor to safely update UI state after background work.
+- Cancel tasks in onDisappear or deinit where relevant to prevent memory leaks.
+
+## 13. Persistence
+- Use @AppStorage for simple user preferences.
+- Use CoreData or SwiftData for structured, queryable storage.
+- Avoid direct access to UserDefaults unless using a property wrapper.
+
+## 14. Modifiers & Reusability
+- Create reusable modifiers via View extensions (e.g., .cardStyle(), .primaryButton()).
+- Centralize UI constants (fonts, spacing, colors) into a DesignSystem or Theme struct.
+
+## 15. Code Style
+- Use SwiftLint to enforce consistent style and naming conventions.
+- Name all Swift files according to their contained type (e.g., FoodLoggerViewModel.swift).
+- Keep methods under ~40 lines if possible. Break up longer logic into helper functions.
