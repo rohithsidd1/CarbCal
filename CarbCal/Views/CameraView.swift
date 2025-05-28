@@ -34,34 +34,50 @@ class ImagePickerCoordinator: NSObject, UINavigationControllerDelegate, UIImageP
 
 // MARK: - Image Picker View
 struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var isPresented: Bool
-    @Binding var selectedImage: UIImage?
     let sourceType: UIImagePickerController.SourceType
-    let onDismiss: () -> Void
-    
-    func makeCoordinator() -> ImagePickerCoordinator {
-        return ImagePickerCoordinator(isPresented: $isPresented, selectedImage: $selectedImage, onDismiss: onDismiss)
-    }
+    let onImagePicked: (UIImage) -> Void
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = sourceType
         picker.delegate = context.coordinator
-        picker.allowsEditing = true // Allow basic editing like cropping
         return picker
     }
     
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onImagePicked(image)
+            }
+            picker.dismiss(animated: true)
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
+        }
+    }
 }
 
 // MARK: - Camera View
 struct CameraView: View {
     // MARK: - Properties
+    let sourceType: UIImagePickerController.SourceType
+    @ObservedObject var viewModel: FoodAnalysisViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedImage: UIImage?
     @State private var showError = false
     @State private var errorMessage = ""
-    let sourceType: UIImagePickerController.SourceType
     
     // MARK: - Body
     var body: some View {
@@ -69,11 +85,12 @@ struct CameraView: View {
             Color.black.edgesIgnoringSafeArea(.all)
             
             ImagePicker(
-                isPresented: .constant(true),
-                selectedImage: $selectedImage,
                 sourceType: sourceType,
-                onDismiss: {
-                    print("[CameraView] Image picker dismissed for source type: \(sourceType == .camera ? "camera" : "photo library")")
+                onImagePicked: { image in
+                    print("[CameraView] Image picked, starting analysis")
+                    Task {
+                        await viewModel.analyzeImage(image)
+                    }
                     dismiss()
                 }
             )
@@ -96,16 +113,12 @@ struct CameraView: View {
                 showError = true
             }
         }
-        .onChange(of: selectedImage) { _, newImage in
-            if let image = newImage {
-                print("[CameraView] Image captured successfully from \(sourceType == .camera ? "camera" : "photo library")")
-                // TODO: Process the captured image
-                dismiss()
-            }
-        }
     }
 }
 
 #Preview {
-    CameraView(sourceType: .camera)
+    CameraView(
+        sourceType: UIImagePickerController.SourceType.camera,
+        viewModel: FoodAnalysisViewModel(openAIService: OpenAIService())
+    )
 } 
